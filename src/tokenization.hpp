@@ -1,9 +1,8 @@
 #pragma once
 
-#include <string>
-#include <vector>
-#include <cassert>
 #include <iostream>
+#include <cctype>
+#include <cstring>
 
 enum class TokenType
 {
@@ -15,231 +14,135 @@ enum class TokenType
     ident,
     let,
     eq,
-    plus,
-    star,
-    minus,
-    fslash,
-    open_curly,
-    close_curly,
-    if_,
-    elif,
-    else_,
-    eof,
-    unknown,
+    inv
 };
-
-inline const char *to_string(TokenType type)
-{
-    static const char *token_strings[] = {
-        "`exit`", "int literal", "`;`", "`(`", "`)`", "identifier",
-        "`let`", "`=`", "`+`", "`*`", "`-`", "`/`", "`{`", "`}`",
-        "`if`", "`elif`", "`else`"};
-    assert(static_cast<int>(type) >= 0 && static_cast<int>(type) < sizeof(token_strings) / sizeof(token_strings[0]));
-    return token_strings[static_cast<int>(type)];
-}
-
-inline int bin_prec(const TokenType type)
-{
-    switch (type)
-    {
-    case TokenType::minus:
-    case TokenType::plus:
-        return 0;
-    case TokenType::fslash:
-    case TokenType::star:
-        return 1;
-    default:
-        return -1;
-    }
-}
 
 struct Token
 {
     TokenType type;
-    int line;
-    std::string_view value;
-
-    Token(TokenType type, int line, std::string_view value)
-        : type(type), line(line), value(value) {}
+    std::string value;
 };
 
 class Tokenizer
 {
 private:
-    const std::string m_src;
+    const char *m_src;
+    size_t m_len;
     size_t m_index = 0;
-    [[nodiscard]] char peek(const size_t offset = 0) const
+    [[nodiscard]] inline char peak(int offset = 0) const
     {
-        if (m_index + offset >= m_src.length())
+        if (m_index + offset >= m_len)
+        {
             return '\0';
-        return m_src.at(m_index + offset);
+        }
+        return m_src[m_index + offset];
     }
-
-    char consume()
+    inline char consume()
     {
-        char result = m_src.at(m_index);
-        ++m_index;
-        return result;
+        return m_src[m_index++];
     }
 
 public:
-    explicit Tokenizer(std::string src)
-        : m_src(std::move(src))
+    static const int MAX_TOKENS = 1000;
+    inline explicit Tokenizer(const char *src)
+        : m_src(src), m_len(strlen(src))
     {
     }
-
-    std::vector<Token> tokenize()
+    inline int tokenize(Token *tokens)
     {
-        std::vector<Token> tokens;
+        int tokenCount = 0;
         std::string buf;
-        int line_count = 1;
-        while (peek() != '\0')
+        char currentChar;
+        while ((currentChar = peak()) != '\0')
         {
-            if (std::isalpha(peek()))
+            if (isalpha(currentChar))
             {
-                buf.push_back(consume());
-                while (peek() != '\0' && std::isalnum(peek()))
+                do
                 {
                     buf.push_back(consume());
-                }
+                } while (isalnum(peak()));
+
                 if (buf == "exit")
                 {
-                    tokens.push_back({TokenType::exit, line_count, nullptr});
+                    tokens[tokenCount++] = {TokenType::exit, ""};
+                    if (tokenCount >= MAX_TOKENS)
+                        break;
                     buf.clear();
+                    continue;
                 }
                 else if (buf == "let")
                 {
-                    tokens.push_back({TokenType::let, line_count, nullptr});
+                    tokens[tokenCount++] = {TokenType::let, ""};
+                    if (tokenCount >= MAX_TOKENS)
+                        break;
                     buf.clear();
-                }
-                else if (buf == "if")
-                {
-                    tokens.push_back({TokenType::if_, line_count, nullptr});
-                    buf.clear();
-                }
-                else if (buf == "elif")
-                {
-                    tokens.push_back({TokenType::elif, line_count, nullptr});
-                    buf.clear();
-                }
-                else if (buf == "else")
-                {
-                    tokens.push_back({TokenType::else_, line_count, nullptr});
-                    buf.clear();
+                    continue;
                 }
                 else
                 {
-                    tokens.push_back({TokenType::ident, line_count, buf});
+                    tokens[tokenCount++] = {TokenType::ident, buf};
+                    if (tokenCount >= MAX_TOKENS)
+                        break;
                     buf.clear();
+                    continue;
                 }
             }
-            else if (std::isdigit(peek()))
+            else if (isdigit(currentChar))
             {
-                buf.push_back(consume());
-                while (peek() != '\0' && std::isdigit(peek()))
+                do
                 {
                     buf.push_back(consume());
-                }
-                tokens.push_back({TokenType::int_lit, line_count, buf});
+                } while (isdigit(peak()));
+                tokens[tokenCount++] = {TokenType::int_lit, buf};
+                if (tokenCount >= MAX_TOKENS)
+                    break;
                 buf.clear();
+                continue;
             }
-            else if (peek() == '/' && peek(1) != '\0' && peek(1) == '/')
+            else if (currentChar == '(')
             {
                 consume();
-                consume();
-                while (peek() != '\0' && peek() != '\n')
-                {
-                    consume();
-                }
+                tokens[tokenCount++] = {TokenType::open_paren, ""};
+                if (tokenCount >= MAX_TOKENS)
+                    break;
+                continue;
             }
-            else if (peek() == '/' && peek(1) != '\0' && peek(1) == '*')
+            else if (currentChar == ')')
             {
                 consume();
-                consume();
-                while (peek() != '\0')
-                {
-                    if (peek() == '*' && peek(1) != '\0' && peek(1) == '/')
-                    {
-                        break;
-                    }
-                    consume();
-                }
-                if (peek() != '\0')
-                {
-                    consume();
-                }
-                if (peek() != '\0')
-                {
-                    consume();
-                }
+                tokens[tokenCount++] = {TokenType::close_paren, ""};
+                if (tokenCount >= MAX_TOKENS)
+                    break;
+                continue;
             }
-            else if (peek() == '(')
+            else if (currentChar == '=')
             {
                 consume();
-                tokens.push_back({TokenType::open_paren, line_count, nullptr});
+                tokens[tokenCount++] = {TokenType::eq, ""};
+                if (tokenCount >= MAX_TOKENS)
+                    break;
+                continue;
             }
-            else if (peek() == ')')
+            else if (currentChar == ';')
             {
                 consume();
-                tokens.push_back({TokenType::close_paren, line_count, nullptr});
+                tokens[tokenCount++] = {TokenType::semi, ""};
+                if (tokenCount >= MAX_TOKENS)
+                    break;
+                continue;
             }
-            else if (peek() == ';')
+            else if (isspace(currentChar))
             {
                 consume();
-                tokens.push_back({TokenType::semi, line_count, nullptr});
-            }
-            else if (peek() == '=')
-            {
-                consume();
-                tokens.push_back({TokenType::eq, line_count, nullptr});
-            }
-            else if (peek() == '+')
-            {
-                consume();
-                tokens.push_back({TokenType::plus, line_count, nullptr});
-            }
-            else if (peek() == '*')
-            {
-                consume();
-                tokens.push_back({TokenType::star, line_count, nullptr});
-            }
-            else if (peek() == '-')
-            {
-                consume();
-                tokens.push_back({TokenType::minus, line_count, nullptr});
-            }
-            else if (peek() == '/')
-            {
-                consume();
-                tokens.push_back({TokenType::fslash, line_count, nullptr});
-            }
-            else if (peek() == '{')
-            {
-                consume();
-                tokens.push_back({TokenType::open_curly, line_count, nullptr});
-            }
-            else if (peek() == '}')
-            {
-                consume();
-                tokens.push_back({TokenType::close_curly, line_count, nullptr});
-            }
-            else if (peek() == '\n')
-            {
-                consume();
-                line_count++;
-            }
-            else if (std::isspace(peek()))
-            {
-                consume();
+                continue;
             }
             else
             {
-                // throw std::runtime_error("Unexpected character: " + std::string(1, peek()));
-                std::cerr << "Invalid token" << std::endl;
+                std::cerr << "Invalid character encountered: " << currentChar << std::endl;
                 exit(EXIT_FAILURE);
             }
         }
         m_index = 0;
-        return tokens;
+        return tokenCount;
     }
 };
