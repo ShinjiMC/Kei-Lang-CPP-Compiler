@@ -2,27 +2,23 @@
 
 #include "parser.hpp"
 #include <unordered_map>
-#include <variant>
-#include <string>
-#include <vector>
-#include <fstream>
-#include <iostream>
-#include <optional>
-#include <sstream>
-#include <vector>
-#include <variant>
+
 class Generator
 {
 private:
-    void push(const std::string &reg)
+    void push(const char *reg)
     {
-        m_output << "    push " << reg << "\n";
+        m_output += "    push ";
+        m_output += reg;
+        m_output += "\n";
         m_stack_size++;
     }
 
-    void pop(const std::string &reg)
+    void pop(const char *reg)
     {
-        m_output << "    pop " << reg << "\n";
+        m_output += "    pop ";
+        m_output += reg;
+        m_output += "\n";
         m_stack_size--;
     }
 
@@ -32,7 +28,7 @@ private:
     };
 
     const NodeProg m_prog;
-    std::stringstream m_output;
+    std::string m_output;
     size_t m_stack_size = 0;
     std::unordered_map<std::string, Var> m_vars{};
 
@@ -49,7 +45,9 @@ public:
 
     void gen_exprIntLit(const NodeExprIntLit &expr_int_lit)
     {
-        m_output << "    mov rax, " << expr_int_lit.int_lit.value << "\n";
+        m_output += "    mov rax, ";
+        m_output += expr_int_lit.int_lit.value;
+        m_output += "\n";
         push("rax");
     }
     void gen_exprIdent(const NodeExprIdent &expr_ident)
@@ -60,9 +58,29 @@ public:
             exit(EXIT_FAILURE);
         }
         const auto &var = m_vars.at(expr_ident.ident.value);
-        std::stringstream offset;
-        offset << "QWORD [rsp + " << (m_stack_size - var.stack_loc - 1) * 8 << "]\n";
-        push(offset.str());
+        char buffer[128];
+        int len = snprintf(buffer, sizeof(buffer), "QWORD [rsp + %zu]\n", (m_stack_size - var.stack_loc - 1) * 8);
+        if (len < 0)
+        {
+            std::cerr << "Error formatting string.\n";
+            exit(EXIT_FAILURE);
+        }
+        if (static_cast<size_t>(len) >= sizeof(buffer))
+        {
+            size_t needed_size = len + 1;
+            char *dynamic_buffer = new char[needed_size];
+            len = snprintf(dynamic_buffer, needed_size, "QWORD [rsp + %zu]\n", (m_stack_size - var.stack_loc - 1) * 8);
+            if (len < 0 || static_cast<size_t>(len) >= needed_size)
+            {
+                std::cerr << "Error formatting string even with dynamic buffer.\n";
+                delete[] dynamic_buffer;
+                exit(EXIT_FAILURE);
+            }
+            push(dynamic_buffer);
+            delete[] dynamic_buffer;
+        }
+        else
+            push(buffer);
     }
 
     void gen_stmt(const NodeStmt &stmt)
@@ -73,9 +91,9 @@ public:
     void gen_stmtExit(const NodeStmtExit &stmt_exit)
     {
         gen_expr(stmt_exit.expr);
-        m_output << "    mov rax, 60\n";
+        m_output += "    mov rax, 60\n";
         pop("rdi");
-        m_output << "    syscall\n";
+        m_output += "    syscall\n";
     }
 
     void gen_stmtLet(const NodeStmtLet &stmt_let)
@@ -91,16 +109,12 @@ public:
 
     [[nodiscard]] std::string gen_prog()
     {
-        m_output << "global _start\n_start:\n";
-
+        m_output += "global _start\n_start:\n";
         for (const auto &stmt : m_prog.stmts)
-        {
             gen_stmt(*stmt);
-        }
-
-        m_output << "    mov rax, 60\n";
-        m_output << "    mov rdi, 0\n";
-        m_output << "    syscall\n";
-        return m_output.str();
+        m_output += "    mov rax, 60\n";
+        m_output += "    mov rdi, 0\n";
+        m_output += "    syscall\n";
+        return m_output;
     }
 };

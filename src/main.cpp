@@ -34,28 +34,8 @@ int main(int argc, char *argv[])
         std::cerr << "No tokens generated" << std::endl;
         return EXIT_FAILURE;
     }
-
     Parser parser(tokens, numTokens);
     NodeProg prog = parser.parse_prog();
-    /*
-    Generator generator(exitNode);
-    {
-        std::fstream file("out.asm", std::ios::out);
-        file << generator.gen_prog();
-    }
-    std::vector<Token> tokens2;
-    for (int i = 0; i < numTokens; i++)
-    {
-        tokens2.push_back(tokens[i]);
-    }
-    Parser parser(std::move(tokens2));
-    std::optional<NodeProg> prog = parser.parse_prog();
-
-    if (!prog.has_value())
-    {
-        std::cerr << "Invalid program" << std::endl;
-        exit(EXIT_FAILURE);
-    }*/
     Generator generator(std::move(prog));
     {
         std::fstream file("out.asm", std::ios::out);
