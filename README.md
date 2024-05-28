@@ -4,6 +4,16 @@
 
 @ShinjiMC - By Braulio Nayap Maldonado Casilla
 
+## How to Run:
+
+To build and run the project, follow these commands:
+
+```bash
+mkdir build
+cmake -S . -B build && cmake --build build
+./build/kei_lang code.kei && ./out; echo $?
+```
+
 ## License:
 
 This project is licensed under [Creative Commons Atribución-NoComercial-CompartirIgual 4.0 Internacional](http://creativecommons.org/licenses/by-nc-sa/4.0/):

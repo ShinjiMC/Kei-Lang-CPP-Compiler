@@ -1,3 +1,20 @@
-let x = 7;
-let y = 54;
-exit(x);
+let y = (30 - 8 * 3) / 3;
+let x = 7; // first
+// first
+if (x - 7) {
+    x = 1;
+}
+elif (y - 1)
+{
+    x = 2;
+}
+else
+{
+    x = 3;
+}
+
+exit(y);
+
+/*
+exit(4);
+*/
