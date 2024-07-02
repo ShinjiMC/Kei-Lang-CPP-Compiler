@@ -1,148 +1,127 @@
 #pragma once
 
-#include <iostream>
-#include <cctype>
-#include <cstring>
+#include <string>
+#include <vector>
 
-enum class TokenType
-{
-    exit,
-    int_lit,
-    semi,
-    open_paren,
-    close_paren,
-    ident,
-    let,
-    eq,
-    inv
-};
+enum class TokenType { exit, int_lit, semi, open_paren, close_paren, ident, let, eq, plus, star, sub, div };
 
-struct Token
+std::optional<int> bin_prec(TokenType type)
 {
+    switch (type) {
+    case TokenType::sub:
+    case TokenType::plus:
+        return 0;
+    case TokenType::div:
+    case TokenType::star:
+        return 1;
+    default:
+        return {};
+    }
+}
+
+struct Token {
     TokenType type;
-    std::string value;
+    std::optional<std::string> value {};
 };
 
-class Tokenizer
-{
-private:
-    const char *m_src;
-    size_t m_len;
-    size_t m_index = 0;
-    [[nodiscard]] inline char peak(int offset = 0) const
-    {
-        if (m_index + offset >= m_len)
-        {
-            return '\0';
-        }
-        return m_src[m_index + offset];
-    }
-    inline char consume()
-    {
-        return m_src[m_index++];
-    }
-
+class Tokenizer {
 public:
-    static const int MAX_TOKENS = 1000;
-    inline explicit Tokenizer(const char *src)
-        : m_src(src), m_len(strlen(src))
+    inline explicit Tokenizer(std::string src)
+        : m_src(std::move(src))
     {
     }
-    inline int tokenize(Token *tokens)
-    {
-        int tokenCount = 0;
-        std::string buf;
-        char currentChar;
-        while ((currentChar = peak()) != '\0')
-        {
-            if (isalpha(currentChar))
-            {
-                do
-                {
-                    buf.push_back(consume());
-                } while (isalnum(peak()));
 
-                if (buf == "exit")
-                {
-                    tokens[tokenCount++] = {TokenType::exit, ""};
-                    if (tokenCount >= MAX_TOKENS)
-                        break;
-                    buf.clear();
-                    continue;
-                }
-                else if (buf == "let")
-                {
-                    tokens[tokenCount++] = {TokenType::let, ""};
-                    if (tokenCount >= MAX_TOKENS)
-                        break;
-                    buf.clear();
-                    continue;
-                }
-                else
-                {
-                    tokens[tokenCount++] = {TokenType::ident, buf};
-                    if (tokenCount >= MAX_TOKENS)
-                        break;
-                    buf.clear();
-                    continue;
-                }
-            }
-            else if (isdigit(currentChar))
-            {
-                do
-                {
+    inline std::vector<Token> tokenize()
+    {
+        std::vector<Token> tokens;
+        std::string buf;
+        while (peek().has_value()) {
+            if (std::isalpha(peek().value())) {
+                buf.push_back(consume());
+                while (peek().has_value() && std::isalnum(peek().value())) {
                     buf.push_back(consume());
-                } while (isdigit(peak()));
-                tokens[tokenCount++] = {TokenType::int_lit, buf};
-                if (tokenCount >= MAX_TOKENS)
-                    break;
+                }
+                if (buf == "exit") {
+                    tokens.push_back({ .type = TokenType::exit });
+                    buf.clear();
+                }
+                else if (buf == "let") {
+                    tokens.push_back({ .type = TokenType::let });
+                    buf.clear();
+                }
+                else {
+                    tokens.push_back({ .type = TokenType::ident, .value = buf });
+                    buf.clear();
+                }
+            }
+            else if (std::isdigit(peek().value())) {
+                buf.push_back(consume());
+                while (peek().has_value() && std::isdigit(peek().value())) {
+                    buf.push_back(consume());
+                }
+                tokens.push_back({ .type = TokenType::int_lit, .value = buf });
                 buf.clear();
-                continue;
             }
-            else if (currentChar == '(')
-            {
+            else if (peek().value() == '(') {
                 consume();
-                tokens[tokenCount++] = {TokenType::open_paren, ""};
-                if (tokenCount >= MAX_TOKENS)
-                    break;
-                continue;
+                tokens.push_back({ .type = TokenType::open_paren });
             }
-            else if (currentChar == ')')
-            {
+            else if (peek().value() == ')') {
                 consume();
-                tokens[tokenCount++] = {TokenType::close_paren, ""};
-                if (tokenCount >= MAX_TOKENS)
-                    break;
-                continue;
+                tokens.push_back({ .type = TokenType::close_paren });
             }
-            else if (currentChar == '=')
-            {
+            else if (peek().value() == ';') {
                 consume();
-                tokens[tokenCount++] = {TokenType::eq, ""};
-                if (tokenCount >= MAX_TOKENS)
-                    break;
-                continue;
+                tokens.push_back({ .type = TokenType::semi });
             }
-            else if (currentChar == ';')
-            {
+            else if (peek().value() == '=') {
                 consume();
-                tokens[tokenCount++] = {TokenType::semi, ""};
-                if (tokenCount >= MAX_TOKENS)
-                    break;
-                continue;
+                tokens.push_back({ .type = TokenType::eq });
             }
-            else if (isspace(currentChar))
-            {
+            else if (peek().value() == '+') {
                 consume();
-                continue;
+                tokens.push_back({ .type = TokenType::plus });
             }
-            else
-            {
-                std::cerr << "Invalid character encountered: " << currentChar << std::endl;
+            else if (peek().value() == '*') {
+                consume();
+                tokens.push_back({ .type = TokenType::star });
+            }
+            else if (peek().value() == '-') {
+                consume();
+                tokens.push_back({ .type = TokenType::sub });
+            }
+            else if (peek().value() == '/') {
+                consume();
+                tokens.push_back({ .type = TokenType::div });
+            }
+            else if (std::isspace(peek().value())) {
+                consume();
+            }
+            else {
+                std::cerr << "You messed up!" << std::endl;
                 exit(EXIT_FAILURE);
             }
         }
         m_index = 0;
-        return tokenCount;
+        return tokens;
     }
+
+private:
+    [[nodiscard]] inline std::optional<char> peek(int offset = 0) const
+    {
+        if (m_index + offset >= m_src.length()) {
+            return {};
+        }
+        else {
+            return m_src.at(m_index + offset);
+        }
+    }
+
+    inline char consume()
+    {
+        return m_src.at(m_index++);
+    }
+
+    const std::string m_src;
+    size_t m_index = 0;
 };

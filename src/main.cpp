@@ -1,46 +1,50 @@
-#include <fstream>
-#include <iostream>
 #include <cctype>
 #include <cstring>
-#include "generation.hpp"
+#include <fstream>
+#include <iostream>
+#include <optional>
+#include <sstream>
+#include <vector>
 
-int main(int argc, char *argv[])
+#include "./generation.hpp"
+
+int main(int argc, char* argv[])
 {
-    if (argc != 2)
-    {
+    if (argc != 2) {
         std::cerr << "Incorrect usage. Correct usage is..." << std::endl;
         std::cerr << "kei_lang <input.kei>" << std::endl;
         return EXIT_FAILURE;
     }
-    const char *filename = argv[1];
-    if (strlen(filename) < 5 || strcmp(filename + strlen(filename) - 4, ".kei") != 0)
-    {
+    const char* filename = argv[1];
+    if (strlen(filename) < 5 || strcmp(filename + strlen(filename) - 4, ".kei") != 0) {
         std::cerr << "The input file must have a '.kei' extension." << std::endl;
         return EXIT_FAILURE;
     }
+    std::string contents;
+    {
+        std::stringstream contents_stream;
+        std::fstream input(argv[1], std::ios::in);
+        contents_stream << input.rdbuf();
+        contents = contents_stream.str();
+    }
 
-    std::ifstream input(filename);
-    if (!input)
-    {
-        std::cerr << "Failed to open input file." << std::endl;
-        return EXIT_FAILURE;
+    Tokenizer tokenizer(std::move(contents));
+    std::vector<Token> tokens = tokenizer.tokenize();
+
+    Parser parser(std::move(tokens));
+    std::optional<NodeProg> prog = parser.parse_prog();
+
+    if (!prog.has_value()) {
+        std::cerr << "Invalid program" << std::endl;
+        exit(EXIT_FAILURE);
     }
-    std::string contents((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
-    Tokenizer tokenizer(contents.c_str());
-    Token tokens[Tokenizer::MAX_TOKENS];
-    int numTokens = tokenizer.tokenize(tokens);
-    if (numTokens == 0)
-    {
-        std::cerr << "No tokens generated" << std::endl;
-        return EXIT_FAILURE;
-    }
-    Parser parser(tokens, numTokens);
-    NodeProg prog = parser.parse_prog();
-    Generator generator(std::move(prog));
+
+    Generator generator(prog.value());
     {
         std::fstream file("out.asm", std::ios::out);
         file << generator.gen_prog();
     }
+
     system("nasm -felf64 out.asm");
     system("ld -o out out.o");
 
