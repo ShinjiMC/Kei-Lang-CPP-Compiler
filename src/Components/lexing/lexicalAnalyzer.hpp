@@ -7,7 +7,8 @@
 #include <string>
 #include <vector>
 
-enum class TokenType {
+enum class TokenType
+{
     exit,
     int_lit,
     semi,
@@ -26,21 +27,24 @@ enum class TokenType {
     elif,
     else_,
 };
-
-struct Token {
+std::ostream &operator<<(std::ostream &os, TokenType type);
+struct Token
+{
     TokenType type;
     int line;
     std::optional<std::string> value;
 };
+std::ostream &operator<<(std::ostream &os, const Token &token);
 
-class LexicalAnalyzer {
+class LexicalAnalyzer
+{
 private:
     std::string sourceCode;
     size_t currentIndex = 0;
 
     [[nodiscard]] char peek(size_t offset = 0) const;
     char consume();
-    void skipWhitespace(int& lineCount);
+    void skipWhitespace(int &lineCount);
     std::optional<Token> parseIdentifierOrKeyword(int lineCount);
     std::optional<Token> parseNumber(int lineCount);
     std::optional<Token> parseCommentOrSlash(int lineCount);
@@ -50,5 +54,5 @@ public:
     explicit LexicalAnalyzer(std::string src);
     std::vector<Token> tokenize();
 };
-const char* toString(TokenType type);
-bool binaryPrecedence(TokenType type, int& precedence);
+const char *toString(TokenType type);
+bool binaryPrecedence(TokenType type, int &precedence);
