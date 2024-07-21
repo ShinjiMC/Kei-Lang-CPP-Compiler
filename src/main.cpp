@@ -1,12 +1,8 @@
+#include "Components/generator/generatorCode.hpp"
 #include <cctype>
 #include <cstring>
 #include <fstream>
 #include <iostream>
-#include <optional>
-#include <sstream>
-#include <vector>
-
-#include "Components/generator/generatorCode.hpp"
 
 void show_usage(const char *program_name)
 {
@@ -22,7 +18,7 @@ bool has_correct_extension(const char *filename)
     return len >= ext_len && std::strcmp(filename + len - ext_len, extension) == 0;
 }
 
-void generateAndSaveOutput(const NodeProg &prog)
+void generateAndSaveOutput(const ProgramNode &prog)
 {
     Generator generator(prog);
     std::fstream file("out.asm", std::ios::out);
@@ -49,17 +45,26 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
     std::string contents((std::istreambuf_iterator<char>(input)), std::istreambuf_iterator<char>());
-    LexicalAnalizer lexicalAnalyzer(std::move(contents));
+    LexicalAnalyzer lexicalAnalyzer(std::move(contents));
     std::vector<Token> tokens = lexicalAnalyzer.tokenize();
+    /* Show Tokens of FIle
+    for (const Token &token : tokens)
+    {
+        std::cout << token << std::endl;
+    }
+    */
     SyntaxAnalyzer syntaxAnalyzer(std::move(tokens));
-    std::optional<NodeProg> prog = syntaxAnalyzer.parse_prog();
+    std::optional<ProgramNode> prog = syntaxAnalyzer.parseProgram();
     if (!prog.has_value())
     {
         std::cerr << "Invalid program" << std::endl;
         exit(EXIT_FAILURE);
     }
+
+    // std::cout << prog.value() << std::endl; // Show AST
     generateAndSaveOutput(prog.value());
     system("nasm -felf64 out.asm");
     system("ld -o out out.o");
+
     return EXIT_SUCCESS;
 }

@@ -1,29 +1,35 @@
 #pragma once
 
-#include <cassert>
-#include <unordered_map>
+#include "Components/syntax/syntaxAnalyzer.hpp"
+#include <algorithm>
+#include <ranges>
 #include <sstream>
-#include "Components/syntax/syntaxAnalizer.hpp"
 
-class Generator
-{
+class Generator {
 private:
-    void push(const std::string &reg);
-    void pop(const std::string &reg);
-    struct Var
-    {
+    struct Var {
+        std::string name;
         size_t stack_loc;
     };
-    const NodeProg m_prog;
+    const ProgramNode m_prog;
     std::stringstream m_output;
     size_t m_stack_size = 0;
-    std::unordered_map<std::string, Var> m_vars;
+    std::vector<Var> m_vars {};
+    std::vector<size_t> m_scopes {};
+    int m_label_count = 0;
+    void push(const std::string& reg);
+    void pop(const std::string& reg);
+    void begin_scope();
+    void end_scope();
+    std::string create_label();
 
 public:
-    explicit Generator(NodeProg prog);
-    void gen_term(const NodeTerm *term);
-    void gen_bin_expr(const NodeBinExpr *bin_expr);
-    void gen_expr(const NodeExpr *expr);
-    void gen_stmt(const NodeStmt *stmt);
+    explicit Generator(ProgramNode prog);
+    void gen_term(const TermNode* term);
+    void gen_bin_expr(const BinaryExpressionNode* bin_expr);
+    void gen_expr(const ExprNode* expr);
+    void gen_scope(const ScopeNode* scope);
+    void gen_if_pred(const ElseIfNode* pred, const std::string& end_label);
+    void gen_stmt(const StmtNode* stmt);
     [[nodiscard]] std::string gen_prog();
 };

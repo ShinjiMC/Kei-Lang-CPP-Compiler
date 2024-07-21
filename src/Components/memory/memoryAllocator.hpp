@@ -1,38 +1,43 @@
 #pragma once
 
-#include <cstdlib>
 #include <cstddef>
-#include <type_traits>
+#include <memory>
+#include <utility>
+#include <vector>
 
-class MemoryAllocator
-{
+class MemoryAllocator {
 private:
-    size_t m_size;
-    std::byte *m_buffer;
-    std::byte *m_offset;
+    size_t capacity_;
+    std::vector<std::byte> buffer_;
+    std::byte* current_;
 
 public:
-    inline explicit MemoryAllocator(size_t bytes)
-        : m_size(bytes)
+    explicit MemoryAllocator(size_t capacity)
+        : capacity_(capacity)
+        , buffer_(capacity)
+        , current_(buffer_.data())
     {
-        m_buffer = static_cast<std::byte *>(malloc(m_size));
-        m_offset = m_buffer;
     }
+    MemoryAllocator(const MemoryAllocator&) = delete;
+    MemoryAllocator& operator=(const MemoryAllocator&) = delete;
 
     template <typename T>
-    inline T *alloc()
+    [[nodiscard]] T* allocate()
     {
-        void *offset = m_offset;
-        m_offset += sizeof(T);
-        return static_cast<T *>(offset);
+        size_t remainingBytes = capacity_ - static_cast<size_t>(current_ - buffer_.data());
+        auto pointer = static_cast<void*>(current_);
+        void* alignedAddress = std::align(alignof(T), sizeof(T), pointer, remainingBytes);
+        if (alignedAddress == nullptr) {
+            throw std::bad_alloc {};
+        }
+        current_ = static_cast<std::byte*>(alignedAddress) + sizeof(T);
+        return static_cast<T*>(alignedAddress);
     }
 
-    inline MemoryAllocator(const MemoryAllocator &other) = delete;
-
-    inline MemoryAllocator operator=(const MemoryAllocator &other) = delete;
-
-    inline ~MemoryAllocator()
+    template <typename T, typename... Args>
+    [[nodiscard]] T* construct(Args&&... args)
     {
-        free(m_buffer);
+        T* allocatedSpace = allocate<T>();
+        return new (allocatedSpace) T(std::forward<Args>(args)...);
     }
 };
